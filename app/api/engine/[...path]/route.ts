@@ -45,7 +45,12 @@ async function proxy(request:Request,context:Context) {
   }
   if(request.headers.get("range")) headers.set("Range",request.headers.get("range")!);
   try {
-    const upstream=await fetch(target,{method:request.method,headers,body,redirect:"error",signal:AbortSignal.timeout(path.endsWith("/render")?300000:60000)});
+    // Workers support manual redirects; never forward the engine token to a redirect target.
+    const upstream=await fetch(target,{method:request.method,headers,body,redirect:"manual",signal:AbortSignal.timeout(path.endsWith("/render")?300000:60000)});
+    if(upstream.status >= 300 && upstream.status < 400) {
+      await upstream.body?.cancel();
+      throw new Error("Engine redirects are not allowed");
+    }
     if(path === "health") {
       if(!upstream.ok) return json({configured:true,available:false,detail:"Engine antwortet nicht korrekt. Server und Zugriffstoken prüfen."});
       const health=await upstream.json() as {mode?:string;ffmpeg_available?:boolean};
