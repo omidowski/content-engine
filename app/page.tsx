@@ -54,12 +54,12 @@ export default function Studio() {
     catch { const result = { configured: false, available: false, detail: "Verbindung konnte nicht geprüft werden." }; setHealth(result); return result; }
   }
   useEffect(() => {
-    void checkConnection();
+    void connectEngine(true);
     const result = new URLSearchParams(window.location.search).get("social");
     if (result) {
       setPublishingOpen(true);
       window.history.replaceState(null, "", "/");
-      if (result === "connected") { toast.success("Kontoanmeldung abgeschlossen"); void connectEngine(); }
+      if (result === "connected") toast.success("Kontoanmeldung abgeschlossen");
       else toast.error("Kontoanmeldung fehlgeschlagen. Verbindung und Anbieter-Konfiguration prüfen.");
     }
   }, []);
@@ -120,14 +120,17 @@ export default function Studio() {
       replace(result); setVideoShown(true); toast.success("Dein Video ist fertig");
     });
   }
-  async function connectEngine() {
+  async function connectEngine(automatic = false) {
     await perform("Verbindung wird geprüft …", async () => {
       const connection = await checkConnection();
-      if (!connection.available) throw new Error(connection.detail || "Die Python-Engine ist noch nicht verbunden.");
+      if (!connection.available) {
+        if (automatic) return;
+        throw new Error(connection.detail || "Die Python-Engine ist noch nicht verbunden.");
+      }
       const data = await request<Content[]>("content");
       setMode("engine"); setItems(data); setSettingsOpen(false);
-      if (data.length) choose(data[0]); else { setSelected(-1); setNewOpen(true); }
-      toast.success("Python-Engine verbunden");
+      if (data.length) choose(data[0]); else { setSelected(-1); if (!automatic) setNewOpen(true); }
+      if (!automatic) toast.success("Python-Engine verbunden");
     });
   }
   function editField(key: keyof Content, value: string) { setEdited(item => ({ ...item, [key]: value })); setChecked(false); setVideoShown(false); }
@@ -140,7 +143,7 @@ export default function Studio() {
     <header className="masthead"><a className="wordmark" href="/" aria-label="Omid Content Studio" onClick={event => { if(dirty) { event.preventDefault(); toast.info("Bitte Änderungen zuerst speichern."); } }}><span className="brand-icon"><Clapperboard size={23}/></span><span>omid<span className="brand-period">.</span><span className="brand-product">content studio</span></span></a><div className="header-right"><span className="private-label"><ShieldCheck size={15}/>Privater Workspace</span><button className="connection-button" onClick={() => setSettingsOpen(true)}><Settings2 size={16}/><span>{mode === "demo" ? "Demo-Modus" : "Engine verbunden"}</span></button><span className="avatar" aria-label="Omid Moraveji">OM</span></div></header>
     <main className="studio-main">
       <div className="page-heading"><div><div className="eyebrow">DEIN CREATOR-WORKSPACE</div><h1>Aus Ideen wird Content<span>.</span></h1><p>Entwerfen. Prüfen. Produzieren.</p></div><button className="button primary new-top" onClick={() => setNewOpen(true)} disabled={!!busy || dirty}><Plus size={19}/>Neuer Short</button></div>
-      <div className="demo-notice"><span className="notice-icon"><Radio size={17}/></span><p>{mode === "demo" ? <><strong>Dein Studio zum Ausprobieren.</strong> Beispielinhalte bleiben nur in dieser Sitzung. Noch keine AI-Produktion.</> : <><strong>Deine Engine ist verbunden.</strong> {health?.mode === "live" ? "Skripte und Videos werden auf deinem Server erstellt." : "Die Engine nutzt mindestens einen Demo-Fallback."}</>}</p><button onClick={() => setSettingsOpen(true)}>{mode === "demo" ? "Engine verbinden" : "Verbindung prüfen"}<ArrowRight size={15}/></button></div>
+      <div className="demo-notice"><span className="notice-icon"><Radio size={17}/></span><p>{mode === "demo" ? <><strong>Dein Studio zum Ausprobieren.</strong> Beispielinhalte bleiben nur in dieser Sitzung. Noch keine AI-Produktion.</> : <><strong>Deine Engine ist verbunden.</strong> {health?.mode === "live" ? "Skripte und Videos werden auf deinem Server erstellt." : "Für die AI-Produktion fehlen noch vollständige KI- und Sprachzugänge."}</>}</p><button onClick={() => setSettingsOpen(true)}>{mode === "demo" ? "Engine verbinden" : "Verbindung prüfen"}<ArrowRight size={15}/></button></div>
       <nav className="workspace-navigation" aria-label="Arbeitsbereich"><button className={!publishingOpen?"selected":""} onClick={()=>setPublishingOpen(false)}>Content erstellen</button><button className={publishingOpen?"selected":""} onClick={()=>setPublishingOpen(true)}>Veröffentlichen & planen</button></nav>
       {publishingOpen && <PublishingPanel connected={mode === "engine"} items={items} onConnect={()=>setSettingsOpen(true)}/>}
       <div className="workbench" hidden={publishingOpen}>
